@@ -266,25 +266,32 @@ module ChipInterface
     
     logic [8:0] row;
     logic [9:0] col;
-    logic not_red, not_green1, not_green2, not_blue1, not_blue2, not_blue3, not_blue4;
-	 logic blank;
+    // logic not_red, not_green1, not_green2, not_blue1, not_blue2, not_blue3, not_blue4;
+	logic blank;
+	logic [7:0] red, green, blue;
 
     vga VGA (CLOCK_50, ~KEY[2], VGA_HS, VGA_VS, blank, row, col);
-    range_check RED (col, 0, 319, not_red);
+    
+    /*range_check RED (col, 0, 319, not_red);
     range_check GREEN1 (col, 0, 159, not_green1);
     range_check GREEN2 (col, 320, 479, not_green2);
     range_check BLUE1 (col, 0, 79, not_blue1);
     range_check BLUE2 (col, 160, 239, not_blue2);
     range_check BLUE3 (col, 320, 399, not_blue3);
-    range_check BLUE4 (col, 480, 559, not_blue4);
+    range_check BLUE4 (col, 480, 559, not_blue4);*/
 
     assign VGA_SYNC_N = 0;
     assign VGA_CLK = ~CLOCK_50;
 	assign VGA_BLANK_N = ~blank;
 	 
-    assign VGA_R = (not_red) ? 8'h00: 8'hFF;
+	colour C (CLOCK_50, ~KEY[2], row, col, red, green, blue);
+	assign VGA_R = red;
+	assign VGA_G = green;
+	assign VGA_B = blue;
+
+    /*assign VGA_R = (not_red) ? 8'h00: 8'hFF;
     assign VGA_G = (not_green1 | not_green2) ? 8'h00: 8'hFF;
-    assign VGA_B = (not_blue1 | not_blue2 | not_blue3 | not_blue4) ? 8'h00 : 8'hFF;
+    assign VGA_B = (not_blue1 | not_blue2 | not_blue3 | not_blue4) ? 8'h00 : 8'hFF;*/
 
 endmodule: ChipInterface
 
