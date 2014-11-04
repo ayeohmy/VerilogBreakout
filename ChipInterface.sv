@@ -3,11 +3,65 @@
  * @brief: To make Breakout in Verilog for 18-240 LabB
  */
 
+/////////////////////////// BUTTON MODULE /////////////////////////////
+
+module checkButton
+	(input logic reset, 
+	 input logic clock,
+	 input logic button, 
+	 output logic [1:0] buttonPress);
+	 
+	enum logic [1:0] {notPressed, pressed, held, released} state, nextState;
+	
+    always_comb begin 
+        case (state)
+            notPressed: begin 
+					if (button == 0) nextState = pressed;
+					else nextState = notPressed;
+            end
+
+            pressed: begin
+                nextState = held;     
+            end
+
+            held: begin
+                if(button == 1) nextState = released;
+                else nextState = held;
+            end
+				
+				released: begin
+					nextState = notPressed;
+				end
+				
+            default: 
+                nextState = (~reset) ? state : notPressed;
+        endcase
+    end
+	 
+	always_comb begin
+		unique case(state)
+			notPressed: 
+				buttonPress = 0;
+			pressed:
+				buttonPress = 1;
+			held:
+				buttonPress = 2;
+			released:
+				buttonPress = 3;
+		endcase
+	end
+
+    always_ff @(posedge clock)
+        if(reset) state <= notPressed;
+        else state <= nextState;
+
+endmodule: checkButton
+
 
 /////////////////////////// OBJECT MODULE /////////////////////////////
 
 module wall
-	(input logic CLOCK_50,
+	(input logic CLOCK_50, reset
 	 input logic [8:0] row,
 	 input logic [9:0] col,
 	output logic signal);
@@ -21,6 +75,41 @@ module wall
 	assign signal = leftWall | rightWall | topWall;
 
 endmodule: wall
+
+
+module paddle
+	(input logic CLOCK_50, reset,
+	 input logic [8:0] row,
+	 input logic [9:0] col,
+	 input left, right;
+	output logic signal);
+
+    logic [15:0] paddlePosition; // left column of paddle
+    logic withinRow, within col;
+
+    assign withinRow = (row >= 440 && row <= 459);
+    assign withinCol = (col >= paddlePosition && col <= (paddlePosition+64)) && (col > 39 && col < 590);
+
+    assign signal = withinRow && withinCol;
+
+    always @(row == 480 && col == 640) begin // game clock period
+        if(reset) begin 
+            paddlePosition = (225+40)-(32); // middle of game area - half paddle width
+        end
+       	else if((left && right) || (~left && ~right))
+       		paddlePosition = paddlePosition;
+       	else if (left && ~right) begin
+       		if(paddlePosition - 5 > 39)
+       			paddlePosition = paddlePosition - 5;
+        end
+        else if (~left && right) begin
+        	if(paddlePosition + 5 < 590)
+        		paddlePosition = paddlePosition + 5;
+        end
+    end
+
+endmodule: paddle
+
 
 //////////////////////////// CHIP INTERFACE ///////////////////////////
 
