@@ -4,6 +4,24 @@
  */
 
 
+/////////////////////////// OBJECT MODULE /////////////////////////////
+
+module wall
+	(input logic CLOCK_50,
+	 input logic [8:0] row,
+	 input logic [9:0] col,
+	output logic signal);
+
+	logic leftWall, rightWall, topWall;
+
+	assign leftWall = (col >= 20 && col <= 39) && (row >= 10 && row <=469);
+	assign rightWall = (col >= 590 && col <= 609) && (row >= 10 && row <=469);
+	assign topWall = (row >= 10 && row <= 29) && (col >= 20 && col <= 609);
+
+	assign signal = leftWall | rightWall | topWall;
+
+endmodule: wall
+
 //////////////////////////// CHIP INTERFACE ///////////////////////////
 
 module ChipInterface
