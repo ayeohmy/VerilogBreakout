@@ -31,11 +31,7 @@ module ChipInterface
 
     assign VGA_SYNC_N = 0;
     assign VGA_CLK = ~CLOCK_50;
-	 assign VGA_BLANK_N = ~blank;
-	 /*
-	 assign VGA_R = 8'hFF;
-	 assign VGA_G = 8'h00;
-	 assign VGA_B = 8'h00;*/
+	assign VGA_BLANK_N = ~blank;
 	 
     assign VGA_R = (not_red) ? 8'h00: 8'hFF;
     assign VGA_G = (not_green1 | not_green2) ? 8'h00: 8'hFF;
@@ -55,7 +51,7 @@ module vga_test;
     
     logic [15:0] rowCount,count;
 
-	 assign rowCount = V.rowCount;
+	assign rowCount = V.rowCount;
     assign count = V.clockCount;
     assign HDisp = V.Tdisp;
     assign VDisp = V.RTdisp;
@@ -71,18 +67,10 @@ module vga_test;
         #5 CLOCK_50 = 1;
         #5 CLOCK_50 = 0;       
         #5 reset = 0;
-
-        /*for(int i = 0; i < 276447232; i++) begin
-            #10 CLOCK_50 = ~CLOCK_50;
-        end*/
-		  
-		  forever #5 CLOCK_50 = ~CLOCK_50;
+  
+		forever #5 CLOCK_50 = ~CLOCK_50;
 		  
     end
-    
-    /*initial begin
-        CLOCK_50 = 0;
-    end*/
 endmodule: vga_test
 
 
@@ -111,9 +99,9 @@ module vga
 
     assign row = rowCount;
     assign col = (clockCount-288)/2;
-    assign VS = (RTpw) ? 0:1;
-    assign HS = (Tpw) ? 0:1;
-    assign blank = (Tdisp && RTdisp) ? 0:1;
+    assign VS = ~RTpw; 	// (RTpw) ? 0:1;
+    assign HS = ~Tpw;	// (Tpw) ? 0:1;
+    assign blank = ~(Tdisp && RTdisp); 	//(Tdisp && RTdisp) ? 0:1;
 
     always @(posedge CLOCK_50) begin
         if(reset) begin 
