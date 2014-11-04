@@ -63,14 +63,15 @@ module colour
 	(input logic CLOCK_50, reset
 	 input logic [8:0] row,
 	 input logic [9:0] col,
-	output logic [7:0] red, green, blue);
+	output logic [7:0] red, green, blue
+	 input logic left, right);
 
 	logic [4:0] brick; // which brick is being looked at?
 	logic paddle, wall;
 	// logic ball;											// TODO~
 
 	bricks BR (CLOCK_50, reset, row, col, brick);
-	paddle PAD (CLOCK_50, reset, row, col, paddle);
+	paddle PAD (CLOCK_50, reset, row, col, left, right, paddle);
 	wall WAL (CLOCK_50, reset, row, col, wall);
 	// ball BAL (CLOCK_50, reset, row, col, ball);			// TODO~
 
@@ -283,8 +284,11 @@ module ChipInterface
     assign VGA_SYNC_N = 0;
     assign VGA_CLK = ~CLOCK_50;
 	assign VGA_BLANK_N = ~blank;
+
+	checkButton B0 (reset, CLOCK_50, KEY[0], right)
+	checkButton B3 (reset, CLOCK_50, KEY[3], left)
 	 
-	colour C (CLOCK_50, ~KEY[2], row, col, red, green, blue);
+	colour C (CLOCK_50, ~KEY[2], row, col, red, green, blue, left, right);
 	assign VGA_R = red;
 	assign VGA_G = green;
 	assign VGA_B = blue;
