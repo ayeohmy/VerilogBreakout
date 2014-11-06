@@ -64,16 +64,17 @@ module colour
 	 input logic [8:0] row,
 	 input logic [9:0] col,
 	output logic [7:0] red, green, blue
-	 input logic left, right);
+	 input logic left, right, start);
 
-	logic [4:0] brick; // which brick is being looked at?
+	logic [4:0] brick, brickHit; // which brick is being looked at?
 	logic paddle, wall;
-	// logic ball;											// TODO~
+	logic ball;			
 
-	bricks BR (CLOCK_50, reset, row, col, brick);
+	bricks BR (CLOCK_50, reset, row, col, brickHit, brick);
 	paddle PAD (CLOCK_50, reset, row, col, left, right, paddle);
 	wall WAL (CLOCK_50, reset, row, col, wall);
-	// ball BAL (CLOCK_50, reset, row, col, ball);			// TODO~
+	ball BAL (CLOCK_50, reset, row, col, start, ball, brickHit);		
+
 
 	always_comb begin
 		if (wall) begin
@@ -98,13 +99,15 @@ module colour
 			green = 8'hFF;
 			blue = 8'h00;
 		end
-		// else if (ball) begin								// TODO~
-
-		// end
-		else begin
+		else if (ball) begin								
 			red = 8'hFF;
-			green = 8hFF;
+			green = 8'hFF;
 			blue = 8'hFF;
+		end
+		else begin
+			red = 8'h00;
+			green = 8h00;
+			blue = 8'h00;
 		end
 
 	end
@@ -120,7 +123,10 @@ module bricks
 	(input logic CLOCK_50, reset
 	 input logic [8:0] row,
 	 input logic [9:0] col,
+	 input logic [4:0] brickHit,
 	output logic [4:0] brick);
+
+	// TODO: How to deal with bricks that got hit if we know which brick got hit? ie. change that bricks signal to 0 forever until reset
 
 	logic brick0, brick1, brick2, brick3, brick4, brick5, brick6, brick7, brick8, brick9, brickA, brickB;
 
@@ -179,7 +185,7 @@ module brick
 	offset_check row (row, LEFT, WIDTH, withinRow);
 	offset_check col (col, TOP, HEIGHT, withinColumn);
 
-	// assign withinRow = (row >= LEFT && row <= (LEFT + WIDTH));
+	// assign withinRow = (row >= LEFT && row <= (LEFT + WIDTH));		cleaned up - below too
 	// assign withinColumn = (col >= TOP && col <= (TOP + HEIGHT));
 
 	assign signal = withinRow && withinColumn;
@@ -259,11 +265,11 @@ module ball
 	 input logic [8:0] row,
 	 input logic [9:0] col,
 	 input startKey;
-	output logic signal);
+	output logic signal
+	output logic [4:0] hitBrick);			// sending hitBrick back may or may not be bad...
 
 	reg [10:0] ballRow, ballCol;
 	reg playing;
-	logic [4:0] hitBrick;
 	logic hitTopWall, hitPaddle, hitLeftWall, hitRightWall;
 	reg movingUp, movingLeft;
 
@@ -283,9 +289,10 @@ module ball
 	assign movingUp = ((movingUp) && ~(hitTopWall || hitBrick)) || (~movingUp && hitPaddle);
 	assign movingLeft = (movingLeft && ~hitLeftWall) || (~movingLeft && hitRightWall);
 
+	assign signal = ((row >= ballRow) && (row < ballRow+4)) && ((col >= ballCol) && (col < ballCol+4));
 
     always @(row == 480 && col == 640) begin // game clock period
-        if(key1) begin 
+        if(startKey) begin 
 			playing = 1;
 			ballRow = 420;
 			ballCol = 400;
@@ -341,10 +348,11 @@ module ChipInterface
     assign VGA_CLK = ~CLOCK_50;
 	assign VGA_BLANK_N = ~blank;
 
-	checkButton B0 (reset, CLOCK_50, KEY[0], right)
-	checkButton B3 (reset, CLOCK_50, KEY[3], left)
+	checkButton B0 (reset, CLOCK_50, KEY[0], right);
+	checkButton B3 (reset, CLOCK_50, KEY[3], left);
+	checkButton B1 (reset, CLOCK_50, KEY[1], start);
 	 
-	colour C (CLOCK_50, ~KEY[2], row, col, red, green, blue, left, right);
+	colour C (CLOCK_50, ~KEY[2], row, col, red, green, blue, left, right, start);
 	assign VGA_R = red;
 	assign VGA_G = green;
 	assign VGA_B = blue;
