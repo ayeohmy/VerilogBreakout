@@ -219,7 +219,7 @@ endmodule: wall
 
 // This module checks for whether the paddle should be present at the given row and col every game cycle 
 // Returns a 1 signal if the paddle should be there
-// ALSO, the module updates the position of the paddle each time
+// ALSO, the module updates the position of the paddle each game cycle
 module paddle
 	(input logic CLOCK_50, reset,
 	 input logic [8:0] row,
@@ -227,7 +227,7 @@ module paddle
 	 input left, right;
 	output logic signal);
 
-    logic [15:0] paddlePosition; // left column of paddle
+    reg [15:0] paddlePosition; // left column of paddle
     logic withinRow, within col;
 
     assign withinRow = (row >= 440 && row <= 459);
@@ -252,6 +252,62 @@ module paddle
     end
 
 endmodule: paddle
+
+
+module ball
+	(input logic CLOCK_50, reset,
+	 input logic [8:0] row,
+	 input logic [9:0] col,
+	 input startKey;
+	output logic signal);
+
+	reg [10:0] ballRow, ballCol;
+	reg playing;
+	logic [4:0] hitBrick;
+	logic hitTopWall, hitPaddle, hitLeftWall, hitRightWall;
+	reg movingUp, movingLeft;
+
+	initial begin
+		ballRow = 420;
+		ballCol = 400;
+	end
+
+	paddle P (CLOCK_50, reset, row, col, 0, 0, hitPaddle); 				// Potential bug of updating paddle twice? 
+	bricks B (CLOCK_50, reset, row, col, hitBrick);
+
+	assign hitTopWall = ballRow < (29+1);
+
+	assign hitLeftWall = ballCol < (39+1);
+	assign hitRightWall = (ballCol+4) > (590-1);
+
+	assign movingUp = ((movingUp) && ~(hitTopWall || hitBrick)) || (~movingUp && hitPaddle);
+	assign movingLeft = (movingLeft && ~hitLeftWall) || (~movingLeft && hitRightWall);
+
+
+    always @(row == 480 && col == 640) begin // game clock period
+        if(key1) begin 
+			playing = 1;
+			ballRow = 420;
+			ballCol = 400;
+        end
+        if(reset) begin
+        	playing = 0;
+        	ballRow = 420;
+        	ballCol = 400;
+        end
+        if (playing) begin
+        	if(movingUp) 
+	        	ballRow = ballRow - 2;
+	        else 
+	        	ballRow = ballRow + 2;
+
+	        if(movingLeft)
+	        	ballCol = ballCol - 1;
+	        else
+	        	ballCol = ballCol + 1;
+        end
+    end
+endmodule: ball
 
 
 //////////////////////////// CHIP INTERFACE ///////////////////////////
