@@ -3,7 +3,7 @@
  * @brief: To make Breakout in Verilog for 18-240 LabB
  */
 
-`default_nettype null
+`default_nettype 
 
 
 /////////////////////////// GAME CLOCK MODULE /////////////////////////
@@ -74,45 +74,6 @@ module checkButton
 
 endmodule: checkButton
 
-///////////////////////// SEVEN DIGIT THINGY ///////////////////////
-module BCDtoSevenSegment
-  (input logic [3:0] bcd,
-   output logic [6:0] segment);
-   always_comb 
-     case ({bcd[3], bcd[2], bcd[1], bcd[0]})
-       4'b0000: segment = 7'b100_0000;
-       4'b0001: segment = 7'b111_1001;
-       4'b0010: segment = 7'b010_0100;
-       4'b0011: segment = 7'b011_0000;
-       4'b0100: segment = 7'b001_1001;
-       4'b0101: segment = 7'b001_0010;
-       4'b0110: segment = 7'b000_0010;
-       4'b0111: segment = 7'b111_1000;
-       4'b1000: segment = 7'b000_0000;
-       4'b1001: segment = 7'b001_0000;
-       default: segment = 7'b111_1111;
-     endcase // case ({bcd[3], bcd[2], bcd[1], bcd[0]})
-endmodule: BCDtoSevenSegment
-
-module SevenSegmentDigit
-   (input  logic [3:0] bcd,
-    output logic [6:0] segment,
-    input  logic       blank);
-
-   logic [6:0]       decoded;
-
-   BCDtoSevenSegment b2ss(bcd, decoded);
-   
-   always_comb begin
-      if (blank == 1)
-			segment = 7'b111_1111;
-      else
-			segment = decoded;
-   end
-  
-
-endmodule: SevenSegmentDigit
-
 /////////////////////////// COLOUR MODULE /////////////////////////////
 
 module colour
@@ -120,58 +81,29 @@ module colour
 	 input logic [8:0] row,
 	 input logic [9:0] col,
 	 input logic left, right, start,
-	 output logic [7:0] red, green, blue,
-	 output logic [6:0] HEX6,
-	 output logic [11:0] led);
+	 output logic [7:0] red, green, blue);
 
-	logic [4:0] isBrick, brickIndex; // which brick is being looked at?
+	logic [4:0] brick, brickHit; // which brick is being looked at?
 	logic isPaddle, isWall;
 	logic isBall;			
-	logic [11:0] brickTracker;
-	logic [11:0] bricksHit;
-	logic inScreen;
-	logic [2:0] life;
-	logic gameOver;
 
-	bricks BR (CLOCK_50, reset, row, col, isBrick, brickIndex);
+	//bricks BR (CLOCK_50, reset, row, col, brick);
 	
 	paddle PAD (CLOCK_50, gameClock, reset, row, col, left, right, isPaddle);
 	wall WAL (CLOCK_50, gameClock, reset, row, col, isWall);
-	ball BAL (CLOCK_50, gameClock, reset, row, col, start, isBrick, bricksHit, isPaddle, isBall, inScreen, gameOver, led);		
-	
-	SevenSegmentDigit SSD (life, HEX6, 0);
-	
-	//assign led = brickTracker;
-	
-	assign gameOver = !(life) || !(~brickTracker);
-	
+	ball BAL (CLOCK_50, gameClock, reset, row, col, start, ball, brickHit);		
+
+
 	always_comb begin
-	
-		if (isWall && !(~brickTracker)) begin // win-state
-			red = 8'h00;
-			green = 8'h70;
-			blue = 8'hB0;			
-		end		
-		else if (isBall) begin								
-			red = 8'hFF;
-			green = 8'hFF;
-			blue = 8'hFF;
-		end	
-		else if (isWall && life) begin
+		if (isWall) begin
 			red = 8'hCC;
 			green = 8'hCC;
 			blue = 8'hCC;
 		end
-		else if (isWall && !life) begin
-			red = 8'h7C;
-			green = 8'h00;
-			blue = 8'h00;			
-		end
-
-		else if (isBrick && ~brickTracker[brickIndex]) begin
-			if(isBrick[0]) begin
-				red = 8'hFF; // set to ff
-				green = 8'hff; // set to ff
+		/*else if (brick) begin
+			if(brick[0]) begin
+				red = 8'hFF;
+				green = 8'hFF;
 				blue = 8'h00;
 			end
 			else begin
@@ -179,38 +111,25 @@ module colour
 				green = 8'h00;
 				blue = 8'hFF;
 			end
-		end
+		end*/
 		else if (isPaddle) begin
 			red = 8'h00;
 			green = 8'hFF;
 			blue = 8'h00;
 		end
-		else if ((row == 100) || (row == 130) || (row == 150) || (row == 180))begin
+		else if (ball) begin								
 			red = 8'hFF;
- 			green = 8'h00;
-			blue = 8'h00;
+			green = 8'hFF;
+			blue = 8'hFF;
 		end
 		else begin
-			red=8'h0;
-			green=red;
-			blue=red;
+			red = 8'h00;
+			green = 8'h00;
+			blue = 8'h00;
 		end
+
 	end
 
-	always_ff @(posedge CLOCK_50 , posedge reset) begin
-			if (reset) begin
-				brickTracker <= 12'h0;
-				life <= 3;
-			end
-			else if (gameOver && start) begin
-				brickTracker <= 12'h0;
-				life <= 3;
-			end
-			else if(gameClock) begin	
-				brickTracker <= brickTracker | bricksHit;
-				life <= (!inScreen) ? (life-1): life;
-			end	
-	end
 endmodule: colour
 
 /////////////////////////// OBJECT MODULE /////////////////////////////
@@ -222,7 +141,7 @@ module bricks
 	(input logic CLOCK_50, reset,
 	 input logic [8:0] row,
 	 input logic [9:0] col,
-	output logic [4:0] isBrick, brickIndex);
+	output logic [4:0] brick);
 
 	// TODO: How to deal with bricks that got hit if we know which brick got hit? ie. change that bricks signal to 0 forever until reset
 	//	 input logic [4:0] brickHit,
@@ -245,58 +164,30 @@ module bricks
 	brick #(490, 150, 100, 30) bB(CLOCK_50, reset, row, col, brickB); 
 
 	always_comb begin
-		if(brick0)begin
-			isBrick = 1;
-			brickIndex = 0;
-		end
-		else if(brick1) begin
-			isBrick = 2;
-			brickIndex =1;
-		end
-		else if(brick2) begin
-			brickIndex = 2;
-			isBrick = 3;
-		end
-		else if(brick3) begin
-			brickIndex = 3;
-			isBrick = 4;
-		end
-		else if(brick4) begin
-			brickIndex = 4;
-			isBrick = 5;
-		end
-		else if(brick5) begin
-			brickIndex = 5;
-			isBrick = 6;
-		end
-		else if(brick6) begin
-			brickIndex = 6;
-			isBrick = 8;
-		end
-		else if(brick7) begin
-			brickIndex = 7;
-			isBrick = 9;
-		end
-		else if(brick8) begin
-			brickIndex = 8;
-			isBrick = 10;
-		end
-		else if(brick9) begin
-			brickIndex = 9;
-			isBrick = 11;
-		end
-		else if(brickA) begin
-			brickIndex = 10;
-			isBrick = 12;
-		end
-		else if(brickB) begin
-			brickIndex = 11;
-			isBrick = 13;
-		end
-		else begin
-			brickIndex = 12;
-			isBrick = 0;
-		end
+		if(brick0)
+			brick = 1;
+		if(brick1)
+			brick = 2;
+		if(brick2) 
+			brick = 3;
+		if(brick3)
+			brick = 4;
+		if(brick4)
+			brick = 5;
+		if(brick5)
+			brick = 6;
+		if(brick6) 
+			brick = 8;
+		if(brick7)
+			brick = 9;
+		if(brick8)
+			brick = 10;
+		if(brick9)
+			brick = 11;
+		if(brickA)
+			brick = 12;
+		if(brickB)
+			brick = 13;
 	end
 endmodule: bricks
 
@@ -309,8 +200,8 @@ module brick
 
 	logic withinRow, withinColumn;
 
-	offset_check R (col, LEFT, WIDTH, withinColumn);
-	offset_check C (row, TOP, HEIGHT, withinRow);
+	offset_check R (row, LEFT, WIDTH, withinRow);
+	offset_check C (col, TOP, HEIGHT, withinColumn);
 
 	// assign withinRow = (row >= LEFT && row <= (LEFT + WIDTH));		cleaned up - below too
 	// assign withinColumn = (col >= TOP && col <= (TOP + HEIGHT));
@@ -335,7 +226,7 @@ module wall
 	range_check leftCol (col, 20, 39, leftWallCol);
 	range_check rightRow (row, 10, 469, rightWallRow);
 	range_check rightCol (col, 590, 609, rightWallCol);
-	range_check topRow (row, 10, 29, topWallRow); // 10, 29
+	range_check topRow (row, 50, 80, topWallRow); // 10, 29
 	range_check topCol (col, 20, 609, topWallCol);
 
 	assign leftWall = leftWallRow && leftWallCol;
@@ -367,18 +258,15 @@ module paddle
 	assign paddleWidth = 64;
 	 
     assign withinRow = (row >= 440 && row <= 459);
-    assign withinCol = (col >= paddlePosition && col <= (paddlePosition+64)) && (col > 39 && col < (590));
+    assign withinCol = (col >= paddlePosition && col <= (paddlePosition+64)) && (col > 39 && col < (590 - 64));
 
     assign signal = withinRow && withinCol;
-	 
-	 
-    always_ff @(posedge CLOCK_50, posedge reset) begin // game clock period
-	 
+
+    always_ff @(posedge gameClock) begin // game clock period
        if(reset) begin 
-            paddlePosition <= (275+40)-(32); // middle of game area - half paddle width
+            paddlePosition <= (225+40)-(32); // middle of game area - half paddle width
        end
-		 else if(gameClock) begin
-       if((left && right) || (~left && ~right)) begin
+       else if((left && right) || (~left && ~right)) begin
        		paddlePosition <= paddlePosition;
        end
        else if (left && ~right) begin
@@ -390,7 +278,7 @@ module paddle
 				end
        end
        else if (~left && right) begin
-			if(paddlePosition + 64 + 5 < 590) begin
+			if(paddlePosition + paddleWidth + 5 < 590) begin
         		paddlePosition <= paddlePosition + 5;
 			end
 			else begin
@@ -401,7 +289,6 @@ module paddle
 				paddlePosition <= paddlePosition;
 		end
     end
-	 end
 
 endmodule: paddle
 
@@ -410,224 +297,58 @@ module ball
 	(input logic CLOCK_50, gameClock, reset,
 	 input logic [8:0] row,
 	 input logic [9:0] col,
-	 input logic startKey,
-	 input logic [4:0] isBrick, 
-	output logic [11:0] bricksHit,
-	 input logic isPaddle,
+	 input startKey,
 	output logic signal,
-	output logic inScreen,
-	 input logic gameOver,
-	  output logic [11:0] led);			
-	
-	logic [10:0] ballRow, ballCol;
-	logic playing;
-	logic hitTopWall, hitPaddle, hitLeftWall, hitRightWall;
-	logic movingUp, movingLeft;
-	logic [10:0] dx,dy;
-	logic [11:0] hitLeftBrickWall;
-	logic [11:0] hitRightBrickWall;
-	logic [11:0] hitTopBrickWall;
-	logic [11:0] hitBottomBrickWall;
-	logic [11:0] isWithinWidthBrick;
-	logic [11:0] isWithinHeightBrick;
-	
-	logic [11:0] hitTopBrickEdge;
-	logic [11:0] hitBottomBrickEdge;
-	logic [11:0] hitLeftBrickEdge;
-	logic [11:0] hitRightBrickEdge;
-	
-	logic [11:0] brickTracker;
+	output logic [4:0] hitBrick);			// sending hitBrick back may or may not be bad...
 
-	logic [1:0]start;
-	checkButton B1 (reset, CLOCK_50, ~startKey, start);
+	reg [10:0] ballRow, ballCol;
+	reg playing;
+	logic hitTopWall, hitPaddle, hitLeftWall, hitRightWall;
+	reg movingUp, movingLeft;
+
+	initial begin
+		ballRow = 420;
+		ballCol = 400;
+	end
+
 	//paddle P (CLOCK_50, reset, row, col, 0, 0, hitPaddle); 				// Potential bug of updating paddle twice? 
 	//bricks B (CLOCK_50, reset, row, col, hitBrick);
 
 	//register BROW (ballRow, rst, en, gameClock, )
-/*
+
 	assign hitTopWall = ballRow < (29+1);
+
 	assign hitLeftWall = ballCol < (39+1);
-	assign hitRightWall = (ballCol+4) > 590;
+	assign hitRightWall = (ballCol+4) > (590-1);
 
-	assign hitBrick = isBrick && signal && ~bricksHit[isBrick];
-	assign hitPaddle = isPaddle && signal;
-	
-	assign movingUp = ((movingUp) && ~(hitTopWall || hitBrick)) || (~movingUp && (hitPaddle || hitBrick));
+	assign movingUp = ((movingUp) && ~(hitTopWall || hitBrick)) || (~movingUp && hitPaddle);
 	assign movingLeft = (movingLeft && ~hitLeftWall) || (~movingLeft && hitRightWall);
-*/
 
-	range_check leftCol (ballCol, 20, 39, hitLeftWall);
-	range_check rightCol (ballCol+4, 590, 609, hitRightWall);
-	range_check topRow (ballRow, 10, 29, hitTopWall); // 10, 29
-	
-	range_check ballOff (ballRow, 10, 479, inScreen);
-	
-	offset_check leftBrick1 (40, ballCol, 4, hitLeftBrickWall[0]);
-	offset_check rightBrick1 (140, ballCol, 4, hitRightBrickWall[0]);
-	offset_check topBrick1 (100, ballRow, 4, hitTopBrickWall[0]);
-	offset_check bottomBrick1 (130, ballRow, 4, hitBottomBrickWall[0]);
-	range_check widthBrick1 (ballCol, 35, 145, isWithinWidthBrick[0]);
-	range_check heightBrick1 (ballRow, 100, 130, isWithinHeightBrick[0]);
-	
-	offset_check leftBrick2 (140, ballCol, 4, hitLeftBrickWall[1]);
-	offset_check rightBrick2 (240, ballCol, 4, hitRightBrickWall[1]);
-	range_check widthBrick2 (ballCol, 140, 240, isWithinWidthBrick[1]);
-	offset_check topBrick2 (100, ballRow, 4, hitTopBrickWall[1]);
-	offset_check bottomBrick2 (130, ballRow, 4, hitBottomBrickWall[1]);
-	range_check heightBrick2 (ballRow, 100, 130, isWithinHeightBrick[1]);
-	
-	offset_check leftBrick3 (240, ballCol, 4, hitLeftBrickWall[2]);
-	offset_check rightBrick3 (340, ballCol, 4, hitRightBrickWall[2]);
-	range_check widthBrick3 (ballCol, 240, 340, isWithinWidthBrick[2]);
-	offset_check topBrick3 (100, ballRow, 4, hitTopBrickWall[2]);
-	offset_check bottomBrick3 (130, ballRow, 4, hitBottomBrickWall[2]);
-	range_check heightBrick3 (ballRow, 100, 130, isWithinHeightBrick[2]);
-	
-	offset_check leftBrick4 (340, ballCol, 4, hitLeftBrickWall[3]);
-	offset_check rightBrick4 (440, ballCol, 4, hitRightBrickWall[3]);
-	range_check widthBrick4 (ballCol, 340, 440, isWithinWidthBrick[3]);
-	offset_check topBrick4 (100, ballRow, 4, hitTopBrickWall[3]);
-	offset_check bottomBrick4 (130, ballRow, 4, hitBottomBrickWall[3]);
-	range_check heightBrick4 (ballRow, 100, 130, isWithinHeightBrick[3]);
+	assign signal = ((row >= ballRow) && (row < ballRow+4)) && ((col >= ballCol) && (col < ballCol+4));
 
-	offset_check leftBrick5 (440, ballCol, 4, hitLeftBrickWall[4]);
-	offset_check rightBrick5 (540, ballCol, 4, hitRightBrickWall[4]);
-	range_check widthBrick5 (ballCol, 440, 540, isWithinWidthBrick[4]);
-	offset_check topBrick5 (100, ballRow, 4, hitTopBrickWall[4]);
-	offset_check bottomBrick5 (130, ballRow, 4, hitBottomBrickWall[4]);
-	range_check heightBrick5 (ballRow, 100, 130, isWithinHeightBrick[4]);
-	
-	offset_check leftBrick6 (540, ballCol, 4, hitLeftBrickWall[5]);
-	offset_check rightBrick6 (590, ballCol, 4, hitRightBrickWall[5]);
-	range_check widthBrick6 (ballCol, 540, 590, isWithinWidthBrick[5]);
-	offset_check topBrick6 (100, ballRow, 4, hitTopBrickWall[5]);
-	offset_check bottomBrick6 (130, ballRow, 4, hitBottomBrickWall[5]);
-	range_check heightBrick6 (ballRow, 100, 130, isWithinHeightBrick[5]);
-	
-	// BOTTOM BRICKS
-	offset_check leftBrick8 (40, ballCol, 4, hitLeftBrickWall[6]);
-	offset_check rightBrick8 (90, ballCol, 4, hitRightBrickWall[6]);
-	offset_check topBrick8 (150, ballRow, 4, hitTopBrickWall[6]);
-	offset_check bottomBrick8 (180, ballRow, 4, hitBottomBrickWall[6]);
-	range_check widthBrick8 (ballCol, 40, 90, isWithinWidthBrick[6]);
-	range_check heightBrick8 (ballRow, 150, 180, isWithinHeightBrick[6]);
-	
-	offset_check leftBrick9 (90, ballCol, 4, hitLeftBrickWall[7]);
-	offset_check rightBrick9 (190, ballCol, 4, hitRightBrickWall[7]);
-	range_check widthBrick9 (ballCol, 90, 190, isWithinWidthBrick[7]);
-	offset_check topBrick9 (150, ballRow, 4, hitTopBrickWall[7]);
-	offset_check bottomBrick9 (180, ballRow, 4, hitBottomBrickWall[7]);
-	range_check heightBrick9 (ballRow, 150, 180, isWithinHeightBrick[7]);
-	
-	offset_check leftBrick10 (190, ballCol, 4, hitLeftBrickWall[8]);
-	offset_check rightBrick10 (290, ballCol, 4, hitRightBrickWall[8]);
-	range_check widthBrick10 (ballCol, 190, 290, isWithinWidthBrick[8]);
-	offset_check topBrick10 (150, ballRow, 4, hitTopBrickWall[8]);
-	offset_check bottomBrick10 (180, ballRow, 4, hitBottomBrickWall[8]);
-	range_check heightBrick10 (ballRow, 150, 180, isWithinHeightBrick[8]);
-	
-	offset_check leftBrick11 (290, ballCol, 4, hitLeftBrickWall[9]);
-	offset_check rightBrick11 (390, ballCol, 4, hitRightBrickWall[9]);
-	range_check widthBrick11 (ballCol, 290, 390, isWithinWidthBrick[9]);
-	offset_check topBrick11 (150, ballRow, 4, hitTopBrickWall[9]);
-	offset_check bottomBrick11 (180, ballRow, 4, hitBottomBrickWall[9]);
-	range_check heightBrick11 (ballRow, 150, 180, isWithinHeightBrick[9]);
-	
-	offset_check leftBrick12 (390, ballCol, 4, hitLeftBrickWall[10]);
-	offset_check rightBrick12 (490, ballCol, 4, hitRightBrickWall[10]);
-	range_check widthBrick12 (ballCol, 390, 490, isWithinWidthBrick[10]);
-	offset_check topBrick12 (150, ballRow, 4, hitTopBrickWall[10]);
-	offset_check bottomBrick12 (180, ballRow, 4, hitBottomBrickWall[10]);
-	range_check heightBrick12 (ballRow, 150, 180, isWithinHeightBrick[10]);
-	
-	offset_check leftBrick13 (490, ballCol, 4, hitLeftBrickWall[11]);
-	offset_check rightBrick13 (590, ballCol, 4, hitRightBrickWall[11]);
-	range_check widthBrick13 (ballCol, 490, 590, isWithinWidthBrick[11]);
-	offset_check topBrick13 (150, ballRow, 4, hitTopBrickWall[11]);
-	offset_check bottomBrick13 (180, ballRow, 4, hitBottomBrickWall[11]);
-	range_check heightBrick13 (ballRow, 150, 180, isWithinHeightBrick[11]);
+    always @(posedge gameClock) begin // game clock period
+        if(startKey) begin 
+			playing = 1;
+			ballRow = 420;
+			ballCol = 400;
+        end
+        if(reset) begin
+        	playing = 0;
+        	ballRow = 420;
+        	ballCol = 400;
+        end
+        if (playing) begin
+        	if(movingUp) 
+	        	ballRow = ballRow - 2;
+	        else 
+	        	ballRow = ballRow + 2;
 
-	
-	
-	assign hitPaddle = isPaddle && signal;
-	assign signal = !(gameOver) && ((row >= ballRow) && (row < (ballRow+4))) && ((col >= ballCol) && (col < (ballCol+4)));
-	
-	assign hitTopBrickEdge = (hitTopBrickWall & isWithinWidthBrick) & ~brickTracker;
-	assign hitBottomBrickEdge = (hitBottomBrickWall & isWithinWidthBrick) & ~brickTracker;
-	assign hitLeftBrickEdge = (hitLeftBrickWall & isWithinHeightBrick) & ~brickTracker;
-	assign hitRightBrickEdge = (hitRightBrickWall & isWithinHeightBrick)& ~brickTracker;
-	
-	//assign 
-	
-	assign movingUp = (movingUp && !hitTopWall && !hitBottomBrickEdge) || (!movingUp && (hitPaddle || hitTopBrickEdge));
-	assign movingLeft = (movingLeft && !hitLeftWall && !(hitRightBrickEdge)) || (!movingLeft && (hitRightWall || hitLeftBrickEdge));
-	
-	assign led = brickTracker;
-
-   always_ff @(posedge CLOCK_50, posedge reset) begin // game clock period
-        if(reset ) begin
-				dx <= 0;
-				dy <= 0;
-				ballRow <= 420;
-				ballCol <= 400;
-				playing <= 0;
-				brickTracker <= 12'h0;
-        end		  
-		  else if(gameClock) begin
-				if((start == 2) && ~playing) begin 
-					dx <= 1;
-					dy <= -2; // I don't like the specs so I changed it
-					playing <= 1;
-				end
-				else if (!inScreen) begin
-					dx <= 0;
-					dy <= 0;
-					ballRow <= 420;
-					ballCol <= 400;
-					playing <= 0;
-					brickTracker <= brickTracker;	
-					/*if(gameOver) begin	 // lose state
-						brickTracker <= 12'h0;
-					end*/
-				end
-				else if (playing) begin
-					/*if(gameOver) begin // win state
-						brickTracker <= 12'h0;
-						dx <= 0;
-						dy <= 0;
-						ballRow <= 420;
-						ballCol <= 400;
-						playing <= 0;						
-					end
-					else */if (!inScreen) begin
-						dx <= 0;
-						dy <= 0;
-						ballRow <= 420;
-						ballCol <= 400;
-						playing <= 0;
-					end
-					else begin
-						if (movingUp) begin	
-							bricksHit <= (hitTopBrickEdge | hitBottomBrickEdge | hitLeftBrickEdge | hitRightBrickEdge);
-							brickTracker <= (brickTracker | bricksHit);
-							dy <= -2;
-						end
-						else begin
-							bricksHit <= (hitTopBrickEdge | hitBottomBrickEdge | hitLeftBrickEdge | hitRightBrickEdge);
-							brickTracker <= (brickTracker | bricksHit);	
-							dy <= 2;
-						end
-						if(movingLeft)
-							dx <= -1;
-						else
-							dx <= 1;
-						ballRow <= ballRow + dy;
-						ballCol <= ballCol + dx;
-					end
-
-				end
-			end
-	 end
+	        if(movingLeft)
+	        	ballCol = ballCol - 1;
+	        else
+	        	ballCol = ballCol + 1;
+        end
+    end
 endmodule: ball
 
 
@@ -637,7 +358,6 @@ module ChipInterface
     (input logic CLOCK_50,
      input logic [3:0] KEY,
      input logic [17:0] SW,
-	 output logic [17:0] LEDR,
     output logic [6:0] HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HEX6, HEX7,
     output logic [7:0] VGA_R, VGA_G, VGA_B,
     output logic VGA_BLANK_N, VGA_CLK, VGA_SYNC_N,
@@ -670,14 +390,13 @@ module ChipInterface
 	checkButton B1 (reset, CLOCK_50, KEY[1], start);
 	checkButton B2 (reset, CLOCK_50, KEY[2], rst);
 
-	gameClockModule GCM (CLOCK_50, rst, row, col, gameClock);
+	gameClockModule GCM (CLOCK_50, rst, row, col, gameClock)
 	 
-	colour C (CLOCK_50, gameClock, rst, row, col, ~KEY[3], ~KEY[0], ~KEY[1], red, green, blue, HEX6, LEDR[11:0]);
+	colour C (CLOCK_50, gameClock, rst, row, col, ~KEY[3], ~KEY[0], start, red, green, blue);
 	assign VGA_R = (row == 0 || row == 479 || col == 0 || col == 639) ? 8'h10 : red;
 	assign VGA_G = (row == 0 || row == 479 || col == 0 || col == 639) ? 8'h10 : green;
 	assign VGA_B = (row == 0 || row == 479 || col == 0 || col == 639) ? 8'h10 : blue;
-	
-	
+
     /*assign VGA_R = (not_red) ? 8'h00: 8'hFF;
     assign VGA_G = (not_green1 | not_green2) ? 8'h00: 8'hFF;
     assign VGA_B = (not_blue1 | not_blue2 | not_blue3 | not_blue4) ? 8'h00 : 8'hFF;*/
@@ -742,7 +461,7 @@ module vga
 	 offset_check RDISP (rowCount, 31, 479, RTdisp);
 
 
-    assign row = rowCount - 31;
+    assign row = rowCount;
     assign col = (clockCount-288)/2;
     assign VS = ~RTpw; 	// (RTpw) ? 0:1;
     assign HS = ~Tpw;	// (Tpw) ? 0:1;
@@ -777,7 +496,7 @@ module range_check
     (input logic [WIDTH - 1: 0] val, low, high,
     output logic is_between);
 
-    assign is_between = ((low <= val) && (high >= val));
+    assign is_between = ((low <= val) && (high >= val)) ? 1 : 0;
 
 endmodule: range_check
 
